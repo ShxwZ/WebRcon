@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "rcon-client": "^4.2.5",
+    "ws": "^8.18.0"
+  }
+}

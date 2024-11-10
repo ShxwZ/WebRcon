@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Consola de Logs</title>
+        <style>
+            body {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background-color: #121212; /* Fondo oscuro */
+                color: #e0e0e0; /* Color de texto claro */
+                font-family: Arial, sans-serif;
+            }
+
+            #logContainer {
+                background-color: #1e1e1e; /* Fondo del contenedor de logs */
+                padding: 10px;
+                max-height: 600px;
+                height: 100%;
+                max-width: 1270px;
+                width: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+                border-radius: 8px;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+                font-family: monospace; /* Fuente monoespaciada */
+                margin-bottom: 10px; /* Espacio entre el log y el input */
+            }
+
+            #logContainer::-webkit-scrollbar-track {
+                -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+                border-radius: 10px;
+                background-color: transparent;
+            }
+
+            #logContainer::-webkit-scrollbar {
+                width: 8px;
+                background-color: transparent;
+            }
+
+            #logContainer::-webkit-scrollbar-thumb {
+                border-radius: 10px;
+                -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+                background-color: #555;
+            }
+
+            .log-entry {
+                margin: 5px 0;
+                padding: 8px;
+                border-radius: 4px;
+                line-break: anywhere;
+            }
+
+            .info {
+                background-color: rgba(0, 123, 255, 0.2); /* Azul claro */
+                color: #007bff; /* Azul */
+            }
+            .warning {
+                background-color: rgba(255, 193, 7, 0.2); /* Amarillo claro */
+                color: #ffc107; /* Amarillo */
+            }
+            .error {
+                background-color: rgba(220, 53, 69, 0.2); /* Rojo claro */
+                color: #dc3545; /* Rojo */
+            }
+            .success {
+                background-color: rgba(128, 128, 128, 0.2); /* Verde claro */
+                color: #28a745; /* Verde */
+            }
+
+            #commandInput {
+                width: 80%; /* Ajusta el ancho del input */
+                padding: 10px;
+                border-radius: 4px;
+                background-color: #1e1e1e;
+                border: 1px solid #ccc; /* Borde claro */
+                outline: none; /* Sin contorno al seleccionar */
+                color: #e0e0e0;
+                font-size: 16px; /* Tamaño de fuente */
+            }
+
+            #commandInput:focus {
+                border-color: #007bff; /* Cambia el borde al enfocar */
+            }
+
+            #sendButton {
+                padding: 10px 15px;
+                background-color: #007bff; /* Color del botón */
+                color: white; /* Texto blanco */
+                border: none;
+                border-radius: 4px;
+                cursor: pointer; /* Cambia el cursor al pasar el mouse */
+                margin-left: 5px; /* Espacio entre el input y el botón */
+            }
+
+            #sendButton:hover {
+                background-color: #0056b3; /* Color al pasar el mouse */
+            }
+            .command-input-container {
+                display: flex;
+                flex-flow: row nowrap;
+                justify-content: center;
+                max-width: 1270px;
+                width: 100%;
+                margin-block: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="logContainer"></div>
+
+        <div class="command-input-container">
+            <input
+                type="text"
+                id="commandInput"
+                placeholder="Escribe tu comando aquí..."
+            />
+            <button id="sendButton">Ejecutar</button>
+        </div>
+
+        <script>
+            // Crear conexión WebSocket
+            let isLogin = false;
+            let socket;
+
+            function connectSocket() {
+                socket = new WebSocket("ws://localhost:8080");
+                socket.addEventListener("error", function (event) {
+                    alert("Error al conectar con el servidor.");
+                    connectSocket();
+                });
+            }
+            connectSocket();
+
+            // Manejar errores de conexión
+
+            // Función para mostrar mensajes en la consola de logs
+            function logMessage(message, type) {
+                const logContainer = document.getElementById("logContainer");
+                const logEntry = document.createElement("div");
+                const logEntryText = document.createElement("span");
+
+                // Agregar clase de tipo para colorear y formatear
+                logEntry.className = `log-entry ${type}`;
+                logEntry.appendChild(logEntryText);
+                logEntryText.textContent = message; // Mostrar el mensaje completo
+
+                // Agregar el nuevo log al contenedor
+                logContainer.appendChild(logEntry);
+
+                // Desplazar hacia abajo para ver el nuevo log
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            function handleSocket(response) {
+                // Manejar mensajes recibidos del WebSocket
+
+                // Dividir el mensaje en líneas por la marca de tiempo
+                const lines = response.split(/\n/).filter(Boolean); // Separa por líneas
+                let logType = "info"; // Valor predeterminado para el tipo de log
+
+                lines.forEach((line) => {
+                    // Determinar el tipo de log
+                    if (line.includes("Error")) {
+                        logType = "error";
+                    } else if (line.includes("Warning")) {
+                        logType = "warning";
+                    } else {
+                        logType = "success";
+                    }
+
+                    // Si la línea no está vacía, muestra el mensaje
+                    if (line.trim() !== "") {
+                        logMessage(line.trim(), logType);
+                    }
+                });
+            }
+            function handleSends() {
+                // Manejar el envío de comandos
+                document
+                    .getElementById("sendButton")
+                    .addEventListener("click", function () {
+                        const input = document.getElementById("commandInput");
+                        const command = input.value.trim();
+                        if (command) {
+                            // Enviar el comando al WebSocket
+                            socket.send(command);
+                            input.value = ""; // Limpiar el input después de enviar
+                        }
+                    });
+
+                // Enviar comando al presionar "Enter"
+                document
+                    .getElementById("commandInput")
+                    .addEventListener("keypress", function (event) {
+                        if (event.key === "Enter") {
+                            document.getElementById("sendButton").click();
+                        }
+                    });
+            }
+
+            // Función para manejar el proceso de login
+            function handleLogin() {
+                const password = prompt("Introduce la contraseña:");
+                if (password) {
+                    socket.send(password);
+                }
+            }
+
+            // Escuchar mensajes del WebSocket para verificar el login
+            socket.addEventListener("message", function (event) {
+                const response = event.data.replace(/§./g, "");
+
+                if (response === "Logged") {
+                    handleSends();
+                    isLogin = true;
+                }
+
+                if (isLogin) {
+                    handleSocket(response);
+                } else {
+                    handleLogin(); // Volver a pedir la contraseña si no está logueado
+                }
+            });
+        </script>
+    </body>
+</html>
